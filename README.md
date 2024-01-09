@@ -15,3 +15,10 @@ This repository contains:
 
 1. The bioIB package code.
 2. Jupyter notebook tutorial exemplifying the use of the bioIB package functions.
+
+# Installation
+The bioIB package can be installed through pip:
+```
+pip install bioib
+```
+
