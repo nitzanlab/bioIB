@@ -163,7 +163,7 @@ def get_selected_indeces(n_metagenes, unique_indeces_list_x, unique_indeces_list
 
 
 
-def get_representative_genes(compressed_matrices_x, selected_indeces, n_clus, saving_repository=None):
+def get_representative_genes_dict(compressed_matrices_x, selected_indeces, n_clus, saving_repository=None):
     """ Get the matrix of genes representing every metagene.
     Params:
     compressed_matrices_x: list of compressed conditional probability matrices of genes given the metagenes (x|xHat);
@@ -250,3 +250,142 @@ def get_bioIB_compressed_adata(adata, depth, selected_indeces, compressed_matric
     for obs in list(adata.obs):
         compressed_adata.obs[obs]=list(adata.obs[obs])
     return compressed_adata
+
+def get_representative_gene_list(depth, selected_indeces, n_metagenes, rounded_y_given_xHat, x_unique_indeces_list, metagene_order=None):
+    """
+    Returns the indeces of the genes most representative of the metagenes,
+    and extracts the subset of y_given_xHat matrix for hierarchy plotting.
+    
+    Params:
+    depth: hierarchy depth to be plotted;
+    selected_indeces: list of beta indeces at which the gene-to-metagene mapping based on y|xHat and on x|xHat is the same (Rand measure=1);
+    rounded_y_given_xHat: the bioIB output representing the array of the probability matrices p(y|xHat) for each beta, rounded by the bioIB function round_IB_res();
+    x_unique_indeces_list: indeces of unique metagenes from the original p(x|xHat) probability matrix that can be used for its recovery;
+    metagene_order (optional): if given, the metagenes will be ordered accordingly.
+    
+    Returns:
+    gene_indeces_list: list of gene indeces represenattive of the metagenes in the specified order;
+    y_given_xHat_sbst: a subset of the original rounded_y_given_xHat matrix, including only the representative genes and starting from the chosen hierarchy depth.
+    """ 
+    
+    limit=selected_indeces[depth-1]
+    if not metagene_order:
+        metagene_order=np.arange(n_metagenes)
+    gene_indeces_list=[]
+    for mtg_i, metagene in enumerate(metagene_order): 
+        g=np.unique(x_unique_indeces_list[limit])[metagene]
+        gene_indeces_list.append(g)
+    y_given_xHat_sbst=rounded_y_given_xHat[:,:,gene_indeces_list][limit:]
+    return [gene_indeces_list, y_given_xHat_sbst]
+
+def get_merge_list(y_given_xHat_sbst):
+    """
+
+    Parameters
+    ----------
+    y_given_xHat_sbst : np.array of size (|betas|, |Y_vals|, |metagenes|);
+     a subset of the original rounded_y_given_xHat matrix, including only the representative genes and starting from the chosen hierarchy depth.
+
+    Returns
+    -------
+    merge_list : list
+    list of metagene merging events along the reverse annealing process, extracted from y_given_xHat_sbst. 
+
+    """
+    merge_list=[]
+    shape=y_given_xHat_sbst.shape[2]
+    for b in range(y_given_xHat_sbst.shape[0]):
+        [unique_array, inverse_indeces]=np.unique(y_given_xHat_sbst[b,:,:], axis=1, return_inverse=True)
+        new_shape=unique_array.shape[1]
+        if new_shape<shape:
+            merge_list.append([])
+            for new_mg in range(new_shape):
+                old_indeces=np.where(inverse_indeces==new_mg)[0]
+                if len(old_indeces)>1:
+                    merge_list[-1].append(old_indeces)
+            shape=new_shape
+    return merge_list
+
+
+def get_linkage_matrix(merge_list, n_metagenes):
+    """
+    
+
+    Parameters
+    ----------
+    merge_list : list
+        list of metagene merging events along the reverse annealing process, extracted from y_given_xHat_sbst. 
+    n_metagenes : int
+        number of unique metagenes.
+
+    Returns
+    -------
+    Z : list
+        linkage matrix for plotting the dendrogram.
+
+    """
+    new_clusters_dict={}
+    Z=[]
+    distance=0.1
+    for b in merge_list:
+        for merge in b:
+            exists=False
+            merged_new_mgs=[]
+            additional_mgs_merged=[]
+            for cl in new_clusters_dict:  
+                overlap=[g for g in merge if g in new_clusters_dict[cl]]
+                if len(overlap)==len(merge):
+                    exists=True
+                    break
+                elif len(overlap)>0:                    
+                    exists=True
+                    merged_new_mgs.append(cl)
+                    additional_mgs_merged=[g for g in merge if g not in new_clusters_dict[cl]]  
+            if not exists:
+                Z.append(list(merge)+[distance, 2])
+                new_clusters_dict[n_metagenes]=list(merge)
+                n_metagenes +=1
+                distance+=0.1
+            elif exists:
+                if len(merged_new_mgs)==2:
+                    Z.append(merged_new_mgs+[distance, len(merge)])
+                    new_clusters_dict[n_metagenes]=list(merge)
+                    n_metagenes += 1
+                    distance+=0.1
+                    for old_clus in merged_new_mgs:
+                        del new_clusters_dict[old_clus]
+                elif len(merged_new_mgs)==1:
+                    Z.append(merged_new_mgs+additional_mgs_merged+[distance, len(merge)])
+                    new_clusters_dict[n_metagenes]=list(merge)
+                    n_metagenes += 1
+                    distance+=0.1
+                    del new_clusters_dict[merged_new_mgs[0]]
+    return Z
+
+def link_metagenes_to_Y_labels(y_given_xHat, Y_vals, metagene_order=None):
+    """
+    
+
+    Parameters
+    ----------
+    y_given_xHat : np.array of size (|Y_vals|, |n_metagenes|)
+        a compressed probability matrix p(y|xHat)
+    Y_vals : list
+        list of the used Y labels
+    metagene_order (optional): list
+        if given, the metagenes will be ordered accordingly.
+
+    Returns
+    -------
+    mg_to_lbl_dict : dictionary
+        dictionary linking every metagene with its associated Y label 
+        (the one maximizing the probability p(y|xHat))
+
+    """
+    if metagene_order:
+        y_given_xHat=y_given_xHat[:, metagene_order]
+    mg_to_lbl_dict={}
+    for mg in range(y_given_xHat.shape[1]):
+        max_ind=np.argmax(y_given_xHat[:,mg])
+        mg_to_lbl_dict['MG %s' % mg]=Y_vals[max_ind]
+    return mg_to_lbl_dict
