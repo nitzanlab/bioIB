@@ -63,11 +63,12 @@ def plot_bifurcations(depth, selected_indeces, betas, compressed_matrices_y, uni
         real_y=y_order[y]
         axs[y].spines['top'].set_visible(False)
         axs[y].spines['right'].set_visible(False)
-        axs[y].set_xlabel('log(beta)')
-
+        axs[y].set_xlabel('log(\u03B2)')
+        axs[y].set_ylim(-0.05,1.05)
         for mtg_i, metagene in enumerate(metagene_order):
             g=np.unique(unique_indeces_list_y[limit])[metagene]
             axs[y].scatter(logbetas[limit:][::-1], y_xHat_arr[:,real_y,g][limit:][::-1], zorder=1, s=10, color=color1[metagene])
+            #axs[y].plot(logbetas[limit:][::-1], y_xHat_arr[:,real_y,g][limit:][::-1], zorder=1, linewidth=3, color=color1[metagene])
             axs[y].scatter(logbetas[limit:][::-1][-1],
                            y_xHat_arr[:,real_y,g][limit],
                        s=150,
@@ -77,12 +78,12 @@ def plot_bifurcations(depth, selected_indeces, betas, compressed_matrices_y, uni
 
         if y==n_labels-1:
             axs[y].legend(loc=(1.1,0), ncol=1, frameon=False)
-        axs[y].set_ylabel('p(y|x\u0302)')
+        axs[y].set_ylabel('p ( y = %s | x\u0302 )' % Y_vals[real_y])
         axs[y].set_title('%s' % (title_Y_vals[y])) 
+    plt.subplots_adjust(wspace=0.5)
     if file_name:
         plt.savefig(file_name, bbox_inches='tight')
     return None
-
 
 
 def plot_representative_genes(depth, selected_indeces, 
@@ -136,4 +137,44 @@ def plot_representative_genes(depth, selected_indeces,
     if file_name:
         plt.savefig(file_name, bbox_inches='tight')
         
+    return None
+
+
+def plot_metagene_hierarchy(Z, n_metagenes, metagene_to_Y_dict=None, file_name=None):
+    """
+    
+
+    Parameters
+    ----------
+    Z : list
+        linkage matrix for plotting the dendrogram.
+    n_metagenes : int
+        number of unique metagenes
+    metagene_to_Y_dict : dictionary, optional
+        dictionary linking every metagene with its associated Y label 
+        (the one maximizing the probability p(y|xHat)).
+        If provided, the plotted hierarchy will feature the linkage between the metagenes and the Y labels
+        The default is None.
+    file_name (optional): if given, the figure will be saved under a given file name.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    if not metagene_to_Y_dict:
+        labels=['MG %s' % i for i in range(n_metagenes)]
+    else:
+        labels=['MG %s: %s' % (i, metagene_to_Y_dict['MG %s' % i]) for i in range(n_metagenes)]
+        
+    plt.figure(figsize=(4,6))
+    ax=dendrogram(Z, color_threshold=0.1, orientation='left', 
+                  labels=labels,
+                  above_threshold_color='black')
+    ax = plt.gca()
+    ax.get_xaxis().set_visible(False)
+    for pos in ['right', 'top', 'bottom', 'left']: 
+        ax.spines[pos].set_visible(False) 
+    plt.show()
     return None
