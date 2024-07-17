@@ -8,7 +8,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name='bioib',
-    version='0.2.0',
+    version='0.1.2',
     packages=find_packages(),
     description="Biological Information Bottleneck",
     long_description=long_description,
