@@ -17,8 +17,16 @@ This repository contains:
 2. Jupyter notebook tutorial exemplifying the use of the bioIB package functions.
 
 # Installation
-The bioIB package can be installed through pip:
+For running on CPU (sufficient for flat clustering and hierarchical clustering of ~500-1000 genes):
+
 ```
+pip install jax
+pip install bioib
+```
+For running on GPU on Linux (preferable for hierarchical clustering of >1000 genes):
+
+```
+pip install "jax[cuda12]==0.4.25" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install bioib
 ```
 
